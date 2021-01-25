@@ -1,7 +1,9 @@
+import React, { useState, useEffect } from "react";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createStackNavigator } from "@react-navigation/stack";
-import * as React from "react";
+import { API, graphqlOperation, Auth } from "aws-amplify";
+import { StyleSheet } from "react-native";
 
 import Colors from "../constants/Colors";
 import useColorScheme from "../hooks/useColorScheme";
@@ -13,7 +15,8 @@ import {
   HomeNavigatorParamList,
   TabTwoParamList,
 } from "../types";
-import ProfilePicture from "../components/ProfilePicture/index";
+import ProfilePicture from "../components/ProfilePicture";
+import { getUser } from "../graphql/queries";
 
 const BottomTab = createBottomTabNavigator<BottomTabParamList>();
 
@@ -82,6 +85,32 @@ function TabBarIcon(props: {
 const TabOneStack = createStackNavigator<HomeNavigatorParamList>();
 
 function HomeNavigator() {
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    //Get the current user
+
+    const fetchUser = async () => {
+      const userInfo = await Auth.currentAuthenticatedUser({
+        bypassCache: true,
+      });
+      if (!userInfo) {
+        return;
+      }
+      try {
+        const userData = await API.graphql(
+          graphqlOperation(getUser, { id: userInfo.attributes.sub })
+        );
+        if (userData) {
+          setUser(userData.data.getUser);
+        }
+      } catch (error) {
+        console.log(error);
+      }
+    };
+    fetchUser();
+  }, []);
+
   return (
     <TabOneStack.Navigator>
       <TabOneStack.Screen
@@ -97,6 +126,7 @@ function HomeNavigator() {
 
           headerTitle: () => (
             <Ionicons
+              style={styles.logo}
               name={"logo-twitter"}
               size={30}
               color={Colors.light.tint}
@@ -109,14 +139,7 @@ function HomeNavigator() {
               color={Colors.light.tint}
             />
           ),
-          headerLeft: () => (
-            <ProfilePicture
-              size={40}
-              image={
-                "https://scontent-del1-1.xx.fbcdn.net/v/t1.0-9/94437040_1653586971474246_5637917098882629632_o.jpg?_nc_cat=101&ccb=2&_nc_sid=e3f864&_nc_ohc=JsdDeO8UN9cAX91CPQH&_nc_oc=AQlUzDQXTjPTwONUGv1QwNHFwckCzYYz5dfCkNaCwVWy43x8nkRNQo2n2u8ywnCkzdI&_nc_ht=scontent-del1-1.xx&oh=8659ba1fac0038ff8529ebce2fb0ba61&oe=60338B64"
-              }
-            />
-          ),
+          headerLeft: () => <ProfilePicture size={40} image={user?.image} />,
         }}
       />
     </TabOneStack.Navigator>
@@ -136,3 +159,11 @@ function TabTwoNavigator() {
     </TabTwoStack.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  logo: {
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 100,
+  },
+});
