@@ -1,18 +1,23 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Text,
   View,
   TouchableOpacity,
   TextInput,
   StyleSheet,
+  Platform,
+  Image,
 } from "react-native";
 
-import { API, graphqlOperation, Auth } from "aws-amplify";
+import { API, graphqlOperation, Auth, Storage } from "aws-amplify";
 import { AntDesign } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import * as ImagePicker from "expo-image-picker";
+import { v4 as uuidv4 } from "uuid";
+
 import Colors from "../constants/Colors";
 import ProfilePicture from "../components/ProfilePicture";
 import { createTweet } from "../graphql/mutations";
-import { useNavigation } from "@react-navigation/native";
 import navigation from "../navigation";
 
 export default function NewTweetScreen() {
@@ -21,7 +26,60 @@ export default function NewTweetScreen() {
 
   const navigation = useNavigation();
 
+  useEffect(() => {
+    (async () => {
+      if (Platform.OS !== "web") {
+        const {
+          status,
+        } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== "granted") {
+          alert("Sorry, we need camera roll permissions to make this work!");
+        }
+      }
+    })();
+  }, []);
+
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 1,
+    });
+
+    console.log(result);
+
+    if (!result.cancelled) {
+      setImageUrl(result.uri);
+    }
+  };
+
+  const uploadImage = async () => {
+    // await uploadImage();
+    // return;
+    try {
+      const response = await fetch(imageUrl);
+
+      const blob = await response.blob();
+
+      const urlParts = imageUrl.split(".");
+      const extension = urlParts[urlParts.length - 1];
+
+      const key = `${uuidv4()}.${extension}`;
+
+      await Storage.put(key, blob);
+      return key;
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
   const onPostTweet = async () => {
+    let image;
+    if (!!imageUrl) {
+      image = await uploadImage();
+    }
+
     try {
       const currentUser = await Auth.currentAuthenticatedUser({
         bypassCache: true,
@@ -67,12 +125,10 @@ export default function NewTweetScreen() {
             style={styles.tweetInput}
             placeholder={"What's happening?"}
           />
-          <TextInput
-            value={imageUrl}
-            onChangeText={(text) => setImageUrl(text)}
-            style={styles.imageInput}
-            placeholder={"Image url (optional)"}
-          />
+          <TouchableOpacity onPress={pickImage}>
+            <Text style={styles.pickImage}>Pick an image</Text>
+          </TouchableOpacity>
+          <Image source={{ uri: imageUrl }} style={styles.imageUpload} />
         </View>
       </View>
     </View>
@@ -122,4 +178,17 @@ const styles = StyleSheet.create({
   image: {
     paddingTop: 35,
   },
+
+  pickImage: {
+    fontSize: 18,
+    color: Colors.light.tint,
+    marginVertical: 10,
+  },
+
+  imageUpload: {
+    width: 150,
+    height: 150,
+  },
 });
+
+// npm i -save-dev @types/uuid
