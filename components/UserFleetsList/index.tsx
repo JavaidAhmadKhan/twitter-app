@@ -11,6 +11,7 @@ const UserFleetsList = () => {
         data={userWithFleets}
         renderItem={({ item }) => <UserFleetPreview user={item} />}
         horizontal
+        showsHorizontalScrollIndicator={false}
       />
     </View>
   );
